@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+
+{% block title %}Login - Smart Car Dealership{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-5">
+        <div class="card shadow-sm mt-5">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0"><i class="bi bi-person-fill"></i> Login</h4>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('auth.login') }}">
+                    <div class="mb-3">
+                        <label for="username" class="form-label">Username</label>
+                        <input type="text" class="form-control" id="username" name="username"
+                               placeholder="Enter your username" required autofocus>
+                    </div>
+                    <div class="mb-3">
+                        <label for="password" class="form-label">Password</label>
+                        <input type="password" class="form-control" id="password" name="password"
+                               placeholder="Enter your password" required>
+                    </div>
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="bi bi-box-arrow-in-right"></i> Login
+                    </button>
+                </form>
+            </div>
+            <div class="card-footer text-center">
+                <p class="mb-0">Don't have an account?
+                    <a href="{{ url_for('auth.register') }}">Register here</a>
+                </p>
+            </div>
+        </div>
+
+        <!-- Demo Credentials -->
+        <div class="card mt-3">
+            <div class="card-header bg-secondary text-white">
+                <h6 class="mb-0"><i class="bi bi-info-circle"></i> Demo Credentials</h6>
+            </div>
+            <div class="card-body small">
+                <p class="mb-1"><strong>Admin:</strong> <code>Aadith_admin</code> / <code>adminPass123</code></p>
+                <p class="mb-1"><strong>Customer:</strong> <code>rahul_customer</code> / <code>custPass789</code></p>
+                <p class="mb-0"><strong>Customer 2:</strong> <code>priya_v</code> / <code>priyaPass321</code></p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

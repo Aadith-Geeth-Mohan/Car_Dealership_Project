@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+
+{% block title %}Car Inventory - Smart Car Dealership{% endblock %}
+
+{% block content %}
+<div class="row mb-4">
+    <div class="col">
+        <h2><i class="bi bi-car-front"></i> Car Inventory</h2>
+        <p class="text-muted">Browse our collection of {{ total }} vehicles</p>
+    </div>
+</div>
+
+<!-- Filters -->
+<form method="GET" action="{{ url_for('cars.index') }}" class="card p-3 mb-4">
+    <div class="row g-2 align-items-end">
+        <div class="col-md-2">
+            <label class="form-label small">Search</label>
+            <input type="text" class="form-control" name="search" value="{{ search }}"
+                   placeholder="Make, model, VIN...">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Make</label>
+            <select class="form-select" name="make">
+                <option value="">All Makes</option>
+                {% for m in makes %}
+                    <option value="{{ m }}" {% if make == m %}selected{% endif %}>{{ m }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Min Price ($)</label>
+            <input type="number" class="form-control" name="min_price" value="{{ min_price }}"
+                   placeholder="0">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Max Price ($)</label>
+            <input type="number" class="form-control" name="max_price" value="{{ max_price }}"
+                   placeholder="Any">
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Status</label>
+            <select class="form-select" name="status">
+                <option value="">All</option>
+                <option value="Available" {% if status == 'Available' %}selected{% endif %}>Available</option>
+                <option value="Sold" {% if status == 'Sold' %}selected{% endif %}>Sold</option>
+                <option value="Maintenance" {% if status == 'Maintenance' %}selected{% endif %}>Maintenance</option>
+            </select>
+        </div>
+        <div class="col-md-2">
+            <label class="form-label small">Fuel Type</label>
+            <select class="form-select" name="fuel">
+                <option value="">All</option>
+                <option value="Petrol" {% if fuel == 'Petrol' %}selected{% endif %}>Petrol</option>
+                <option value="Diesel" {% if fuel == 'Diesel' %}selected{% endif %}>Diesel</option>
+                <option value="Electric" {% if fuel == 'Electric' %}selected{% endif %}>Electric</option>
+                <option value="Hybrid" {% if fuel == 'Hybrid' %}selected{% endif %}>Hybrid</option>
+            </select>
+        </div>
+    </div>
+    <div class="row mt-2">
+        <div class="col-md-6">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-search"></i> Search
+            </button>
+            <a href="{{ url_for('cars.index') }}" class="btn btn-secondary">
+                <i class="bi bi-x-circle"></i> Clear Filters
+            </a>
+        </div>
+    </div>
+</form>
+
+<!-- Car Grid -->
+{% if cars %}
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 row-cols-xl-4 g-4">
+        {% for car in cars %}
+            <div class="col">
+                <div class="card h-100 car-card">
+                    <div class="position-relative">
+                        {% if car.image_path %}
+                            <img src="{{ url_for('static', filename='images/' + car.image_path) }}"
+                                 alt="{{ car.make }} {{ car.model }}"
+                                 class="card-img-top"
+                                 style="height: 180px; object-fit: cover;"
+                                 onerror="this.outerHTML=`<div class='car-image-placeholder' style='height:180px'><i class='bi bi-car-front-fill'></i><span>{{ car.make }}</span></div>`">
+                        {% else %}
+                            <div class="car-image-placeholder" style="height: 180px">
+                                <i class="bi bi-car-front-fill"></i>
+                                <span>{{ car.make }}</span>
+                            </div>
+                        {% endif %}
+                        {% if car.status == 'Available' %}
+                            <span class="badge bg-success position-absolute top-0 end-0 m-2">Available</span>
+                        {% elif car.status == 'Sold' %}
+                            <span class="badge bg-danger position-absolute top-0 end-0 m-2">Sold</span>
+                        {% else %}
+                            <span class="badge bg-warning position-absolute top-0 end-0 m-2">Maintenance</span>
+                        {% endif %}
+                    </div>
+                    <div class="card-body">
+                        <h5 class="card-title">{{ car.year }} {{ car.make }} {{ car.model }}</h5>
+                        <p class="card-text text-muted small mb-1">
+                            <i class="bi bi-gear"></i> {{ car.transmission or 'N/A' }} &nbsp;|&nbsp;
+                            <i class="bi bi-fueltank"></i> {{ car.fuel_type or 'N/A' }}
+                        </p>
+                        <p class="card-text small mb-1">
+                            <i class="bi bi-speedometer"></i> {{ car.mileage or 'N/A' }} km &nbsp;|&nbsp;
+                            <i class="bi bi-palette"></i> {{ car.color or 'N/A' }}
+                        </p>
+                        <h6 class="text-primary fw-bold">
+                            ${{ "{:,.2f}".format(car.selling_price) }}
+                        </h6>
+                    </div>
+                    <div class="card-footer bg-white border-top-0">
+                        <a href="{{ url_for('cars.detail', vin=car.vin) }}" class="btn btn-outline-primary btn-sm w-100">
+                            <i class="bi bi-eye"></i> View Details
+                        </a>
+                    </div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination -->
+    {% if total > 20 %}
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page > 1 %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page - 1 }}&search={{ search }}&make={{ make }}&status={{ status }}">Previous</a>
+                    </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link">Page {{ page }} of {{ ((total - 1) // 20) + 1 }}</span>
+                </li>
+                {% if page * 20 < total %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page + 1 }}&search={{ search }}&make={{ make }}&status={{ status }}">Next</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+{% else %}
+    <div class="alert alert-info text-center">
+        <i class="bi bi-info-circle"></i> No cars found matching your criteria.
+    </div>
+{% endif %}
+{% endblock %}

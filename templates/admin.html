@@ -1,0 +1,240 @@
+{% extends "base.html" %}
+
+{% block title %}Admin Panel - Smart Car Dealership{% endblock %}
+
+{% block content %}
+<h2><i class="bi bi-shield-check"></i> Admin Panel</h2>
+<p class="text-muted">Logged in as: {{ session.fname }} ({{ session.role }})</p>
+
+<!-- Stats Cards -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card text-center border-primary">
+            <div class="card-body">
+                <h3 class="text-primary">{{ total_cars }}</h3>
+                <p class="mb-0">Total Cars</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-success">
+            <div class="card-body">
+                <h3 class="text-success">{{ available }}</h3>
+                <p class="mb-0">Available</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-info">
+            <div class="card-body">
+                <h3 class="text-info">{{ total_customers }}</h3>
+                <p class="mb-0">Customers</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card text-center border-warning">
+            <div class="card-body">
+                <h3 class="text-warning">{{ total_transactions }}</h3>
+                <p class="mb-0">Transactions</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<ul class="nav nav-tabs mb-4" role="tablist">
+    <li class="nav-item"><button class="nav-link active" data-bs-toggle="tab" data-bs-target="#transactions">
+        <i class="bi bi-currency-dollar"></i> Transactions
+    </button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#sales">
+        <i class="bi bi-bag-check"></i> Sales
+    </button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#addcar">
+        <i class="bi bi-plus-circle"></i> Add Car
+    </button></li>
+    <li class="nav-item"><button class="nav-link" data-bs-toggle="tab" data-bs-target="#logs">
+        <i class="bi bi-journal-text"></i> Admin Logs
+    </button></li>
+</ul>
+
+<div class="tab-content">
+    <!-- Transactions -->
+    <div class="tab-pane fade show active" id="transactions">
+        {% if transactions %}
+            <table class="table table-sm table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>TXN ID</th>
+                        <th>Customer</th>
+                        <th>Car</th>
+                        <th>Amount</th>
+                        <th>Payment</th>
+                        <th>Status</th>
+                        <th>Date</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for txn in transactions %}
+                        <tr>
+                            <td><code>{{ txn.transaction_id }}</code></td>
+                            <td>{{ txn.fname }} {{ txn.lname }}</td>
+                            <td>{{ txn.make }} {{ txn.model }}</td>
+                            <td class="fw-bold">${{ "{:,.2f}".format(txn.amount) }}</td>
+                            <td>{{ txn.payment_method }}</td>
+                            <td>
+                                {% if txn.transaction_status == 'Success' %}
+                                    <span class="badge bg-success">Success</span>
+                                {% elif txn.transaction_status == 'Failed' %}
+                                    <span class="badge bg-danger">Failed</span>
+                                {% else %}
+                                    <span class="badge bg-warning">Processing</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ txn.transaction_date.strftime('%Y-%m-%d %H:%M') if txn.transaction_date else 'N/A' }}</td>
+                            <td>
+                                {% if txn.transaction_status != 'Failed' %}
+                                    <form action="{{ url_for('admin.verify_transaction', transaction_id=txn.transaction_id) }}" method="POST" class="d-inline">
+                                        <button name="action" value="verify" class="btn btn-sm btn-success">Verify</button>
+                                    </form>
+                                    <form action="{{ url_for('admin.verify_transaction', transaction_id=txn.transaction_id) }}" method="POST" class="d-inline">
+                                        <button name="action" value="reject" class="btn btn-sm btn-danger">Reject</button>
+                                    </form>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info">No pending transactions.</div>
+        {% endif %}
+    </div>
+
+    <!-- Sales -->
+    <div class="tab-pane fade" id="sales">
+        {% if sales %}
+            <table class="table table-sm table-striped">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Sale ID</th>
+                        <th>Customer</th>
+                        <th>Car</th>
+                        <th>Final Price</th>
+                        <th>Sale Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for s in sales %}
+                        <tr>
+                            <td>{{ s.sale_id }}</td>
+                            <td>{{ s.fname }} {{ s.lname }}</td>
+                            <td>{{ s.make }} {{ s.model }}</td>
+                            <td class="fw-bold text-success">${{ "{:,.2f}".format(s.final_sale_price) }}</td>
+                            <td>{{ s.sale_date.strftime('%Y-%m-%d') if s.sale_date else 'N/A' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info">No sales recorded yet.</div>
+        {% endif %}
+    </div>
+
+    <!-- Add Car -->
+    <div class="tab-pane fade" id="addcar">
+        <form action="{{ url_for('admin.add_car') }}" method="POST" class="card p-4">
+            <div class="row g-3">
+                <div class="col-md-3">
+                    <label class="form-label">VIN *</label>
+                    <input type="text" class="form-control" name="vin" placeholder="e.g., 0001" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Make *</label>
+                    <input type="text" class="form-control" name="make" placeholder="e.g., Toyota" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Model *</label>
+                    <input type="text" class="form-control" name="model" placeholder="e.g., Corolla" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Year *</label>
+                    <input type="number" class="form-control" name="year" placeholder="2026" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Selling Price ($) *</label>
+                    <input type="number" step="0.01" class="form-control" name="selling_price" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Cost Price ($) *</label>
+                    <input type="number" step="0.01" class="form-control" name="cost_price" required>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Status</label>
+                    <select class="form-select" name="status">
+                        <option>Available</option>
+                        <option>Maintenance</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Fuel Type</label>
+                    <select class="form-select" name="fuel_type">
+                        <option value="">-- Select --</option>
+                        <option>Petrol</option>
+                        <option>Diesel</option>
+                        <option>Electric</option>
+                        <option>Hybrid</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Transmission</label>
+                    <select class="form-select" name="transmission">
+                        <option value="">-- Select --</option>
+                        <option>Manual</option>
+                        <option>Automatic</option>
+                    </select>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Mileage (km)</label>
+                    <input type="number" class="form-control" name="mileage" value="0">
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label">Color</label>
+                    <input type="text" class="form-control" name="color" placeholder="e.g., Red">
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary mt-3">
+                <i class="bi bi-save"></i> Add / Update Car
+            </button>
+        </form>
+    </div>
+
+    <!-- Admin Logs -->
+    <div class="tab-pane fade" id="logs">
+        {% if logs %}
+            <table class="table table-sm">
+                <thead class="table-dark">
+                    <tr>
+                        <th>Log ID</th>
+                        <th>Admin</th>
+                        <th>Action</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <td>{{ log.log_id }}</td>
+                            <td><span class="badge bg-secondary">{{ log.username }}</span></td>
+                            <td>{{ log.action_performed }}</td>
+                            <td>{{ log.action_date.strftime('%Y-%m-%d %H:%M') if log.action_date else 'N/A' }}</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% else %}
+            <div class="alert alert-info">No admin logs found.</div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
