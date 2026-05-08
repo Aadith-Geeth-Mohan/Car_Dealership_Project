@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, redirect, url_for, session, flash
+from flask import Blueprint, render_template, request, redirect, url_for, session, flash, jsonify
 from werkzeug.security import generate_password_hash, check_password_hash
 from database import get_db
+from decorators import login_required
 import uuid
 
 bp = Blueprint("auth", __name__, url_prefix="/")
@@ -72,6 +73,76 @@ def register():
         return redirect(url_for("auth.login"))
 
     return render_template("register.html")
+
+
+@bp.route("/profile", methods=["GET", "POST"])
+@login_required
+def profile():
+    user_id = session["user_id"]
+    db = get_db()
+
+    if request.method == "POST":
+        action = request.form.get("action", "").strip()
+
+        if action == "update_profile":
+            fname = request.form.get("fname", "").strip()
+            lname = request.form.get("lname", "").strip()
+            if fname and lname:
+                with db.cursor() as cursor:
+                    cursor.execute(
+                        "UPDATE users SET fname = %s, lname = %s WHERE user_id = %s",
+                        (fname, lname, user_id)
+                    )
+                session["fname"] = fname
+                session["lname"] = lname
+                flash("Profile updated successfully!", "success")
+            else:
+                flash("First and last name are required.", "danger")
+
+        elif action == "change_password":
+            current = request.form.get("current_password", "").strip()
+            new_pass = request.form.get("new_password", "").strip()
+            confirm = request.form.get("confirm_password", "").strip()
+
+            if not current or not new_pass:
+                flash("All password fields are required.", "danger")
+                return render_template("profile.html", user=get_profile(user_id))
+
+            if new_pass != confirm:
+                flash("New passwords do not match.", "danger")
+                return render_template("profile.html", user=get_profile(user_id))
+
+            if len(new_pass) < 6:
+                flash("New password must be at least 6 characters.", "danger")
+                return render_template("profile.html", user=get_profile(user_id))
+
+            with db.cursor() as cursor:
+                cursor.execute("SELECT password FROM users WHERE user_id = %s", (user_id,))
+                user = cursor.fetchone()
+                if not check_password_hash(user["password"], current):
+                    flash("Current password is incorrect.", "danger")
+                    return render_template("profile.html", user=get_profile(user_id))
+
+                cursor.execute(
+                    "UPDATE users SET password = %s WHERE user_id = %s",
+                    (generate_password_hash(new_pass), user_id)
+                )
+            flash("Password changed successfully!", "success")
+
+        return redirect(url_for("auth.profile"))
+
+    user = get_profile(user_id)
+    return render_template("profile.html", user=user)
+
+
+def get_profile(user_id):
+    db = get_db()
+    with db.cursor() as cursor:
+        cursor.execute(
+            "SELECT user_id, username, fname, lname, role, created_at FROM users WHERE user_id = %s",
+            (user_id,)
+        )
+        return cursor.fetchone()
 
 
 @bp.route("/logout")

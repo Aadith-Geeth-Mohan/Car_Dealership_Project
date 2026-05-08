@@ -275,6 +275,26 @@ CREATE TABLE IF NOT EXISTS transactionverification (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
 ```
 
+```sql
+-- =============================================
+-- REVIEWS
+-- Customer reviews and ratings for cars
+-- =============================================
+CREATE TABLE IF NOT EXISTS reviews (
+    review_id    INT         NOT NULL AUTO_INCREMENT,
+    user_id      INT         NOT NULL,
+    vin          VARCHAR(17) NOT NULL,
+    rating       TINYINT     NOT NULL CHECK (rating BETWEEN 1 AND 5),
+    comment      TEXT,
+    created_at   TIMESTAMP   NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (review_id),
+    KEY user_id (user_id),
+    KEY vin (vin),
+    CONSTRAINT reviews_ibfk_1 FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+    CONSTRAINT reviews_ibfk_2 FOREIGN KEY (vin) REFERENCES cars (vin) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+```
+
 ---
 
 ## Step 3 — Insert Users

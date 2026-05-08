@@ -1,6 +1,8 @@
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, session
 from database import get_db
 from decorators import login_required
+import pymysql
+from pymysql.err import IntegrityError
 
 bp = Blueprint("customer", __name__, url_prefix="/customer")
 
@@ -57,12 +59,20 @@ def dashboard():
         """, (user_id,))
         purchased = cursor.fetchall()
 
+        # Total spend
+        cursor.execute("""
+            SELECT SUM(final_sale_price) as total_spent
+            FROM sale_details WHERE user_id = %s
+        """, (user_id,))
+        total_spent = cursor.fetchone()["total_spent"] or 0
+
     return render_template(
         "dashboard.html",
         wishlist=wishlist,
         test_drives=test_drives,
         transactions=transactions,
         purchased=purchased,
+        total_spent=total_spent,
     )
 
 
@@ -79,12 +89,13 @@ def add_to_wishlist():
     db = get_db()
     try:
         with db.cursor() as cursor:
+            cursor.execute("INSERT INTO wishlist (user_id, vin) VALUES (%s, %s)", (user_id, vin))
             cursor.execute(
-                "INSERT INTO wishlist (user_id, vin) VALUES (%s, %s)",
+                "INSERT INTO wishlist_entries (user_id, vin) VALUES (%s, %s)",
                 (user_id, vin)
             )
         flash("Car added to your wishlist!", "success")
-    except Exception:
+    except IntegrityError:
         flash("Car already in your wishlist.", "info")
 
     return redirect(request.referrer or url_for("cars.index"))
@@ -99,8 +110,52 @@ def remove_from_wishlist():
     db = get_db()
     with db.cursor() as cursor:
         cursor.execute("DELETE FROM wishlist WHERE user_id = %s AND vin = %s", (user_id, vin))
+        cursor.execute("DELETE FROM wishlist_entries WHERE user_id = %s AND vin = %s", (user_id, vin))
     flash("Car removed from wishlist.", "info")
     return redirect(url_for("customer.dashboard"))
+
+
+@bp.route("/wishlist/toggle", methods=["POST"])
+@login_required
+def ajax_toggle_wishlist():
+    vin = request.form.get("vin", "").strip()
+    user_id = session["user_id"]
+
+    if not vin:
+        return jsonify({"message": "Invalid car.", "type": "danger", "in_wishlist": False})
+
+    db = get_db()
+    with db.cursor() as cursor:
+        cursor.execute("SELECT 1 FROM wishlist WHERE user_id = %s AND vin = %s", (user_id, vin))
+        existing = cursor.fetchone()
+
+        if existing:
+            cursor.execute("DELETE FROM wishlist WHERE user_id = %s AND vin = %s", (user_id, vin))
+            cursor.execute("DELETE FROM wishlist_entries WHERE user_id = %s AND vin = %s", (user_id, vin))
+            return jsonify({
+                "message": "Removed from wishlist.",
+                "type": "info",
+                "in_wishlist": False
+            })
+        else:
+            try:
+                cursor.execute("INSERT INTO wishlist (user_id, vin) VALUES (%s, %s)", (user_id, vin))
+                cursor.execute(
+                    "INSERT INTO wishlist_entries (user_id, vin) VALUES (%s, %s)",
+                    (user_id, vin)
+                )
+                return jsonify({
+                    "message": "Added to wishlist!",
+                    "type": "success",
+                    "in_wishlist": True
+                })
+            except IntegrityError:
+                # Already in wishlist — just confirm it
+                return jsonify({
+                    "message": "Already in your wishlist!",
+                    "type": "info",
+                    "in_wishlist": True
+                })
 
 
 @bp.route("/test-drive/book", methods=["POST"])
@@ -121,7 +176,7 @@ def book_test_drive():
             VALUES (%s, %s, %s, 'Pending')
         """, (user_id, vin, scheduled_date))
     flash("Test drive booked successfully!", "success")
-    return redirect(url_for("customer.dashboard"))
+    return redirect(request.referrer or url_for("customer.dashboard"))
 
 
 @bp.route("/test-drive/cancel", methods=["POST"])
@@ -148,7 +203,7 @@ def buy_car(vin):
 
     if not payment_method:
         flash("Please select a payment method.", "danger")
-        return redirect(request.referrer or url_for("cars.detail", vin=vin))
+        return redirect(url_for("cars.detail", vin=vin))
 
     db = get_db()
     with db.cursor() as cursor:
@@ -172,3 +227,29 @@ def buy_car(vin):
 
     flash(f"Transaction {txn_id} initiated! Awaiting admin verification.", "success")
     return redirect(url_for("customer.dashboard"))
+
+
+@bp.route("/review/<vin>", methods=["POST"])
+@login_required
+def submit_review(vin):
+    user_id = session["user_id"]
+    rating = request.form.get("rating", "5").strip()
+    comment = request.form.get("comment", "").strip()
+
+    if not comment:
+        flash("Please write a review.", "danger")
+        return redirect(url_for("cars.detail", vin=vin))
+
+    db = get_db()
+    try:
+        with db.cursor() as cursor:
+            cursor.execute("""
+                INSERT INTO reviews (user_id, vin, rating, comment)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment)
+            """, (user_id, vin, int(rating), comment))
+        flash("Review submitted successfully!", "success")
+    except pymysql.err.ProgrammingError:
+        flash("Reviews feature unavailable — please create the reviews table in the database.", "danger")
+
+    return redirect(url_for("cars.detail", vin=vin))
